@@ -11,14 +11,15 @@ def single(max_processing_time: datetime.timedelta):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            key = f"lock:{func.__name__}"
-            value = str(time.time())
-            timeout = int(max_processing_time.total_seconds())
-            if redis_client.set(key, value, nx=True, ex=timeout):
+            lock = redis_client.lock(
+                f"lock:{func.__name__}",
+                timeout=int(max_processing_time.total_seconds()),
+            )
+            if lock.acquire(blocking=False):
                 try:
                     return func(*args, **kwargs)
                 finally:
-                    redis_client.delete(key)
+                    lock.release()
             else:
                 raise RuntimeError("Already running the {func.__name__} function")
 
